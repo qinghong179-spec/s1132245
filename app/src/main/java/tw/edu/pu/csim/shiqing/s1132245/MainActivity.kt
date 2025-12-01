@@ -1,4 +1,4 @@
-package tw.edu.pu.csim.shiqing.s1132245
+package tw.edu.pu.csim.shiqing.s1132245 // 僅在檔案頂部出現一次
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -20,8 +20,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             S1132245Theme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "洪詩晴",//顯示 "Hello 洪詩晴
+                    // 正確呼叫，系統會自動使用 ExamViewModel() 的預設值
+                    ExamScreen(
                         modifier = Modifier.padding(innerPadding)
                     )
                 }
@@ -30,6 +30,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+// 保持 Greeting 函式和 Preview 不變
 @Composable
 fun Greeting(name: String, modifier: Modifier = Modifier) {
     Text(

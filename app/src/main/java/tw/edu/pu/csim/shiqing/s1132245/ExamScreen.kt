@@ -1,4 +1,4 @@
-package tw.edu.pu.csim.shiqing.s1132245 // 僅在檔案頂部出現一次
+package tw.edu.pu.csim.shiqing.s1132245
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -17,8 +17,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.foundation.layout.BoxWithConstraints // 2. BoxWithConstraints 匯入
-import tw.edu.pu.csim.shiqing.s1132245.R // 1. R 資源匯入
+import androidx.compose.foundation.layout.BoxWithConstraints
+import tw.edu.pu.csim.shiqing.s1132245.R
+
+// 定義圖示的固定尺寸 (300px = 300.dp 方便計算)
+private val ICON_SIZE = 300.dp
 
 @Composable
 fun ExamScreen(
@@ -26,13 +29,15 @@ fun ExamScreen(
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
-
     val density = LocalDensity.current
 
-    // 使用 BoxWithConstraints 獲取 Composable 的最大尺寸 (以 DP 為單位)
+    // 使用 BoxWithConstraints 獲取 Composable 的最大尺寸 (DP)
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val widthPx = with(density) { constraints.maxWidth.toPx() }
         val heightPx = with(density) { constraints.maxHeight.toPx() }
+
+        // 獲取 DP 單位下的螢幕高度
+        val screenHeightDp = constraints.maxHeight
 
         LaunchedEffect(Unit) {
             viewModel.updateScreenDimensions(widthPx, heightPx)
@@ -41,13 +46,18 @@ fun ExamScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Yellow),
-            contentAlignment = Alignment.Center
+                .background(Color.Yellow), // 黃色背景
+            // ❌ 移除 contentAlignment = Alignment.Center，改用 align()
         ) {
+
+            // ==========================================================
+            // A. 中間的文字和圖片內容 (v2 內容)
+            // ==========================================================
             Column(
+                modifier = Modifier.align(Alignment.Center), // 確保中間內容保持居中
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // ... 圖片和文字部分保持不變 ...
+                // ... (您的 happy.png 圖片) ...
                 Image(
                     painter = painterResource(id = R.drawable.happy),
                     contentDescription = "Exam Logo",
@@ -57,33 +67,64 @@ fun ExamScreen(
 
                 Spacer(modifier = Modifier.height(30.dp))
 
-                Text(
-                    text = "瑪利亞基金會服務大考驗",
-                    fontSize = 18.sp
-                )
-                Spacer(modifier = Modifier.height(10.dp))
+                Text(text = "瑪利亞基金會服務大考驗", fontSize = 18.sp)
+                Spacer(modifier = Modifier.height(10.dp)) // 間距高度 10dp
 
+                Text(text = "作者：${uiState.author}", fontSize = 16.sp)
                 Text(
-                    text = "作者：${uiState.author}", // 顯示：資管一B 洪詩晴
-                    fontSize = 16.sp
-                )
-
-                Text(
-                    text = "螢幕大小：${"%.1f".format(uiState.screenWidthPx)} x ${
-                        "%.1f".format(
-                            uiState.screenHeightPx
-                        )
-                    } px",
+                    text = "螢幕大小：${"%.1f".format(uiState.screenWidthPx)} x ${"%.1f".format(uiState.screenHeightPx)} px",
                     fontSize = 14.sp
                 )
-
-                Text(
-                    text = "成績：${uiState.score}分",
-                    fontSize = 14.sp
-                )
+                Text(text = "成績：${uiState.score}分", fontSize = 14.sp)
             }
+
+            // ==========================================================
+            // B. 四個角色圖示 (v3 新增內容)
+            // ==========================================================
+
+            // 1. 嬰幼兒 (左邊切齊，底部切齊螢幕 1/2 處)
+            Image(
+                painter = painterResource(id = R.drawable.baby),
+                contentDescription = "Infant",
+                modifier = Modifier
+                    .size(ICON_SIZE)
+                    .align(Alignment.TopStart) // 從左上角開始定位
+                    .offset(
+                        x = 0.dp, // 切齊螢幕左邊
+                        y = (screenHeightDp / 2) - ICON_SIZE // 底部位置 (1/2 處) 減去圖示高度
+                    )
+            )
+
+            // 2. 兒童 (右邊切齊，底部切齊螢幕 1/2 處)
+            Image(
+                painter = painterResource(id = R.drawable.child),
+                contentDescription = "Child",
+                modifier = Modifier
+                    .size(ICON_SIZE)
+                    .align(Alignment.TopEnd) // 從右上角開始定位
+                    .offset(
+                        x = 0.dp, // 切齊螢幕右邊
+                        y = (screenHeightDp / 2) - ICON_SIZE
+                    )
+            )
+
+            // 3. 成人 (左邊切齊，底部切齊螢幕底部)
+            Image(
+                painter = painterResource(id = R.drawable.adult),
+                contentDescription = "Adult",
+                modifier = Modifier
+                    .size(ICON_SIZE)
+                    .align(Alignment.BottomStart) // 左邊切齊，底部切齊
+            )
+
+            // 4. 一般民眾 (右邊切齊，底部切齊螢幕底部)
+            Image(
+                painter = painterResource(id = R.drawable.general),
+                contentDescription = "General Public",
+                modifier = Modifier
+                    .size(ICON_SIZE)
+                    .align(Alignment.BottomEnd) // 右邊切齊，底部切齊
+            )
         }
     }
 }
-
-

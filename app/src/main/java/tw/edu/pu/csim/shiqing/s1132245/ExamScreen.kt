@@ -22,6 +22,8 @@ import androidx.compose.foundation.gestures.detectDragGestures // V4: 拖曳手�
 import androidx.compose.ui.input.pointer.pointerInput // V4: 拖曳手勢
 import androidx.compose.ui.unit.IntOffset // V4: 拖曳位移
 import kotlin.math.roundToInt // V4: 座標取整
+import android.widget.Toast // 引入 Toast
+import androidx.compose.ui.platform.LocalContext // 引入 Context
 import tw.edu.pu.csim.shiqing.s1132245.R
 
 // 定義圖示的固定尺寸 (300px 換算為 300.dp)
@@ -45,8 +47,9 @@ fun ExamScreen(
         val screenHeightDp = constraints.maxHeight
 
         LaunchedEffect(Unit) {
-            viewModel.updateScreenDimensions(widthPx, heightPx)
-            viewModel.setDensityRatio(densityRatio) // V5: 傳遞轉換比例給 ViewModel
+            if (uiState.toastMessage.isNotEmpty()) {
+                Toast.makeText(context, uiState.toastMessage, Toast.LENGTH_LONG).show()
+            }
         }
 
         Box(

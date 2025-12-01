@@ -173,6 +173,9 @@ class ExamViewModel : ViewModel() {
             while (true) {
                 kotlinx.coroutines.delay(100)
 
+                // 檢查遊戲是否暫停
+                if (_uiState.value.isGamePaused) continue
+
                 val currentY = _uiState.value.dropIconY
                 val currentX = _uiState.value.dropIconX
                 val screenH = _uiState.value.screenHeightPx
@@ -180,37 +183,81 @@ class ExamViewModel : ViewModel() {
 
                 val collidedRole = checkCollision(currentX, currentY)
 
+                var newState = _uiState.value
+                var shouldReset = false
+                var message = ""
+
                 if (collidedRole != null) {
                     // 1. 發生碰撞
-                    _uiState.value = _uiState.value.copy(
-                        message = "碰撞${collidedRole.roleName.removePrefix("碰撞")}", // 顯示 "碰撞嬰幼兒" 等
-                        score = _uiState.value.score + 1 // 碰撞加分
-                    )
-                    resetDropIcon()
+                    shouldReset = true
+                    val correctRoleName = SERVICE_ANSWERS[dropIconId]
+
+                    // 判斷答案是否正確
+                    if (collidedRole.roleName == correctRoleName) {
+                        newState = newState.copy(score = newState.score + 1) // 正確：加一分
+                    } else {
+                        newState = newState.copy(score = newState.score - 1) // 錯誤：減一分
+                    }
+
+                    // 顯示 Toast 訊息的內容
+                    message =
+                        "${getServiceName(dropIconId)}，屬於${correctRoleName!!.removePrefix("碰撞")}的服務" //
+
                 } else if (currentY + iconH > screenH && screenH != 0f) {
-                    // 2. 掉到螢幕最下方邊界
-                    _uiState.value = _uiState.value.copy(message = "掉到最下方")
-                    resetDropIcon()
+                    // 2. 掉落邊界
+                    shouldReset = true
+
+                    // 掉落邊界，減一分
+                    newState = newState.copy(score = newState.score - 1)
+
+                    val correctRoleName = SERVICE_ANSWERS[dropIconId]
+                    message =
+                        "${getServiceName(dropIconId)}，屬於${correctRoleName!!.removePrefix("碰撞")}的服務" // 顯示答案
+
                 } else {
                     // 3. 繼續掉落
-                    _uiState.value = _uiState.value.copy(
+                    newState = newState.copy(
                         dropIconY = currentY + 20f,
                         message = "" // 清除訊息
                     )
+                }
+
+                if (shouldReset) {
+                    // V6: 碰撞或掉落後，暫停 3 秒，並顯示 Toast
+                    newState = newState.copy(isGamePaused = true)
+                    _uiState.value = newState
+
+                    showToastMessage(message) // 顯示 Toast 提示
+
+                    kotlinx.coroutines.delay(3000) // 暫停 3 秒
+
+                    // 暫停結束，重置並繼續遊戲
+                    resetDropIcon()
+                    _uiState.value = _uiState.value.copy(isGamePaused = false, message = "")
+
+                } else {
+                    _uiState.value = newState
                 }
             }
         }
     }
 
-    fun updateDropIconX(deltaX: Float) {
-        val currentX = _uiState.value.dropIconX
-        val screenW = _uiState.value.screenWidthPx
-        val iconW = _uiState.value.iconWidthPx
-
-        val newX = (currentX + deltaX).coerceIn(0f, screenW - iconW)
-
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(dropIconX = newX)
+    // 實用工具函式 (需要實現 Toast 和資源名稱獲取)
+    private fun getServiceName(id: Int): String {
+        // 這裡需要根據您的 R.drawable.serviceX 實際名稱返回中文名稱
+        // 假設 service0 = "極早期療育", service1 = "華齡服務"
+        return when (id) {
+            R.drawable.service0 -> "極早期療育"
+            R.drawable.service1 -> "華齡服務"
+            R.drawable.service2 -> "極重多障"
+            R.drawable.service3 -> "輔具服務"
+            else -> "某服務"
         }
     }
+
+    data class ExamUiState(
+        // ...
+        val toastMessage: String = "" // V6: 新增用於 Toast 的訊息
+    )
 }
+

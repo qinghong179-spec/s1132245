@@ -1,111 +1,216 @@
-package tw.edu.pu.csim.shiqing.s1132245 // 僅在檔案頂部出現一次
+// ExamViewModel.kt
+
+package tw.edu.pu.csim.shiqing.s1132245
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlin.random.Random
+import tw.edu.pu.csim.shiqing.s1132245.R // 確保 R 資源正確匯入
 
-// 定義畫面狀態的資料類別
+// 定義常數
+private const val DROP_ICON_SIZE_PX = 300f
+private const val ROLE_ICON_SIZE_DP = 300f
+
+// 角色圖示邊界結構
+data class RoleBounds(
+    val roleName: String,
+    var left: Float = 0f,
+    var top: Float = 0f,
+    var right: Float = 0f,
+    var bottom: Float = 0f
+)
+
+// ExamUiState 結構
 data class ExamUiState(
-    val author: String = "資管二B 洪詩晴", // 您的系級與姓名
-    val score: Int = 0,
+    val author: String = "資管一B 洪詩晴", // 您的姓名
+    var score: Int = 0,
     val screenWidthPx: Float = 0f,
     val screenHeightPx: Float = 0f,
 
-    // V4 新增的狀態
-    val dropIconId: Int = R.drawable.service0, // 隨機圖示的資源ID (預設值)
-    val dropIconY: Float = 0f,             // 圖示的垂直位置 (Y 座標)
-    val dropIconX: Float = 0f,             // 圖示的水平位置 (X 座標，用於拖曳)
-    val iconWidthPx: Float = 300f,         // 假設掉落圖示的寬度是 300px
-    val iconHeightPx: Float = 300f         // 假設掉落圖示的高度是 300px
-)
+    // V4 掉落圖示狀態 (使用 service0 作為預設圖示)
+    val dropIconId: Int = R.drawable.service0,
+    val dropIconY: Float = 0f,
+    val dropIconX: Float = 0f,
+    val iconWidthPx: Float = DROP_ICON_SIZE_PX,
+    val iconHeightPx: Float = DROP_ICON_SIZE_PX,
+
+    // V5 碰撞訊息狀態
+    val message: String = ""
 )
 
 class ExamViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(ExamUiState())
     val uiState: StateFlow<ExamUiState> = _uiState
 
+    // 9 個服務圖示的資源 ID 列表 (請檢查 service0 到 service8 是否齊全!)
     private val iconResources = listOf(
-        R.drawable.service0, R.drawable.service0, R.drawable.service0,
-        R.drawable.service1, R.drawable.service2, R.drawable.service0,
-        R.drawable.service1, R.drawable.service2, R.drawable.service3
+        R.drawable.service0, R.drawable.service1, R.drawable.service2,
+        R.drawable.service3, R.drawable.service1, R.drawable.service2,
+        R.drawable.service3, R.drawable.service0, R.drawable.service1
     )
-    data class ExamUiState(
-        // ...
-        val dropIconId: Int = R.drawable.service1, // 預設圖示ID
-        // ...
+
+    // 儲存四個角色圖示的邊界 (順序需與 ExamScreen.kt 的定位邏輯一致)
+    private val roleIcons = listOf(
+        // 1. 嬰幼兒 (左上 1/2) - 對應 R.drawable.role0
+        RoleBounds("碰撞嬰幼兒"),
+        // 2. 兒童 (右上 1/2) - 對應 R.drawable.role0
+        RoleBounds("碰撞兒童"),
+        // 3. 成人 (左下) - 對應 R.drawable.role1
+        RoleBounds("碰撞成人"),
+        // 4. 一般民眾 (右下) - 對應 R.drawable.role3
+        RoleBounds("碰撞一般民眾")
     )
+
+    private var densityRatio: Float = 1f
+
     init {
-        // 在 ViewModel 啟動時開始掉落循環
         startDropping()
     }
 
-    // 更新螢幕寬高的方法
+    // 新增：設定 DP 到 PX 的轉換比例 (從 ExamScreen.kt 傳入)
+    fun setDensityRatio(ratio: Float) {
+        densityRatio = ratio
+    }
+
     fun updateScreenDimensions(width: Float, height: Float) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(
                 screenWidthPx = width,
                 screenHeightPx = height
             )
+            // 確保 X 座標設定為中央
+            if (_uiState.value.dropIconX == 0f) {
+                val centerX = (width / 2f) - (DROP_ICON_SIZE_PX / 2f)
+                _uiState.value = _uiState.value.copy(dropIconX = centerX)
+            }
+
+            // 重新計算碰撞邊界
+            calculateRoleBounds(width, height)
         }
-        // 隨機生成新圖示並重設位置到頂部中央
-        fun resetDropIcon() {
-            // 隨機選擇一個圖示ID
-            val newIconId = iconResources[Random.nextInt(iconResources.size)]
+    }
 
-            // 將 X 座標重設到中央 (螢幕寬度 / 2 - 圖示寬度 / 2)
-            val centerX = (_uiState.value.screenWidthPx / 2f) - (_uiState.value.iconWidthPx / 2f)
+    private fun calculateRoleBounds(width: Float, height: Float) {
+        if (densityRatio == 0f) return
 
-            viewModelScope.launch {
-                _uiState.value = _uiState.value.copy(
-                    dropIconId = newIconId,
-                    dropIconY = 0f,  // Y 座標重設為頂部
-                    dropIconX = centerX // X 座標重設為中央
-                )
+        // 將 300dp 轉換為 px 單位
+        val roleIconSizePx = ROLE_ICON_SIZE_DP * densityRatio
+        val halfScreenHeight = height / 2f
+
+        // 1. 嬰幼兒 (左上 1/2)
+        roleIcons[0].apply {
+            left = 0f
+            top = halfScreenHeight - roleIconSizePx
+            right = roleIconSizePx
+            bottom = halfScreenHeight
+        }
+
+        // 2. 兒童 (右上 1/2)
+        roleIcons[1].apply {
+            left = width - roleIconSizePx
+            top = halfScreenHeight - roleIconSizePx
+            right = width
+            bottom = halfScreenHeight
+        }
+
+        // 3. 成人 (左下)
+        roleIcons[2].apply {
+            left = 0f
+            top = height - roleIconSizePx
+            right = roleIconSizePx
+            bottom = height
+        }
+
+        // 4. 一般民眾 (右下)
+        roleIcons[3].apply {
+            left = width - roleIconSizePx
+            top = height - roleIconSizePx
+            right = width
+            bottom = height
+        }
+    }
+
+    private fun resetDropIcon() {
+        val newIconId = iconResources[Random.nextInt(iconResources.size)]
+
+        val centerX = (_uiState.value.screenWidthPx / 2f) - (DROP_ICON_SIZE_PX / 2f)
+
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                dropIconId = newIconId,
+                dropIconY = 0f,
+                dropIconX = centerX
+            )
+        }
+    }
+
+    // 碰撞偵測函式 (AABB 軸對齊邊界框)
+    private fun checkCollision(dropX: Float, dropY: Float): RoleBounds? {
+        val dropRight = dropX + DROP_ICON_SIZE_PX
+        val dropBottom = dropY + DROP_ICON_SIZE_PX
+
+        for (role in roleIcons) {
+            val overlapX = dropX < role.right && dropRight > role.left
+            val overlapY = dropY < role.bottom && dropBottom > role.top
+
+            if (overlapX && overlapY) {
+                return role
             }
         }
+        return null
+    }
 
-        // 處理掉落動畫的主邏輯 (每 0.1s 掉落 20px)
-        private fun startDropping() {
-            viewModelScope.launch {
-                // 確保螢幕尺寸先被設定
-                while (_uiState.value.screenHeightPx == 0f) {
-                    kotlinx.coroutines.delay(100)
-                }
-
-                // 第一次啟動時，重設圖示到頂部中央
-                resetDropIcon()
-
-                while (true) {
-                    kotlinx.coroutines.delay(100) // 延遲 0.1 秒
-
-                    val currentY = _uiState.value.dropIconY
-                    val screenH = _uiState.value.screenHeightPx
-                    val iconH = _uiState.value.iconHeightPx
-
-                    // 檢查是否碰到螢幕底部 (圖示底部 Y > 螢幕高度)
-                    if (currentY + iconH > screenH) {
-                        resetDropIcon() // 碰到底部，重新生成並回到頂部
-                    } else {
-                        // 向下掉落 20px
-                        _uiState.value = _uiState.value.copy(dropIconY = currentY + 20f)
-                    }
-                }
+    private fun startDropping() {
+        viewModelScope.launch {
+            while (_uiState.value.screenHeightPx == 0f || densityRatio == 0f) {
+                kotlinx.coroutines.delay(100)
             }
-        }
 
-        // 處理水平拖曳的更新
-        fun updateDropIconX(deltaX: Float) {
-            val currentX = _uiState.value.dropIconX
-            val screenW = _uiState.value.screenWidthPx
-            val iconW = _uiState.value.iconWidthPx
+            resetDropIcon()
 
-            // 計算新的 X 位置，並限制在螢幕寬度內
-            val newX = (currentX + deltaX).coerceIn(0f, screenW - iconW)
+            while (true) {
+                kotlinx.coroutines.delay(100)
 
-            viewModelScope.launch {
-                _uiState.value = _uiState.value.copy(dropIconX = newX)
+                val currentY = _uiState.value.dropIconY
+                val currentX = _uiState.value.dropIconX
+                val screenH = _uiState.value.screenHeightPx
+                val iconH = _uiState.value.iconHeightPx
+
+                val collidedRole = checkCollision(currentX, currentY)
+
+                if (collidedRole != null) {
+                    // 1. 發生碰撞
+                    _uiState.value = _uiState.value.copy(
+                        message = "碰撞${collidedRole.roleName.removePrefix("碰撞")}", // 顯示 "碰撞嬰幼兒" 等
+                        score = _uiState.value.score + 1 // 碰撞加分
+                    )
+                    resetDropIcon()
+                } else if (currentY + iconH > screenH && screenH != 0f) {
+                    // 2. 掉到螢幕最下方邊界
+                    _uiState.value = _uiState.value.copy(message = "掉到最下方")
+                    resetDropIcon()
+                } else {
+                    // 3. 繼續掉落
+                    _uiState.value = _uiState.value.copy(
+                        dropIconY = currentY + 20f,
+                        message = "" // 清除訊息
+                    )
+                }
             }
         }
     }
+
+    fun updateDropIconX(deltaX: Float) {
+        val currentX = _uiState.value.dropIconX
+        val screenW = _uiState.value.screenWidthPx
+        val iconW = _uiState.value.iconWidthPx
+
+        val newX = (currentX + deltaX).coerceIn(0f, screenW - iconW)
+
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(dropIconX = newX)
+        }
+    }
+}
